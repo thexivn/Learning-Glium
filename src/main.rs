@@ -34,16 +34,16 @@ fn main() {
     let vertex_buffer = VertexBuffer::new(&display, &shape).unwrap();
     let indices = NoIndices(PrimitiveType::TrianglesList);
 
+    //Note that it is important to write matrix * vertex and not vertex * matrix.
+    //Matrix operations produce different results depending on the order.
     let vertex_shader_src = r#"
         #version 140
 
         in vec2 position;
-        uniform float t;
+        uniform mat4 matrix;
 
         void main() {
-            vec2 pos = position;
-            pos.x += t;
-            gl_Position = vec4(pos, 0.0, 1.0);
+            gl_Position = matrix * vec4(position, 0.0, 1.0);
         }
     "#;
 
@@ -63,20 +63,39 @@ fn main() {
     let mut transform: f32 = -0.5;
     let mut closed = false;
     while !closed {
-        transform += 0.002;
-        if transform > 0.5 {
-            transform = -0.5;
-        }
+        transform += 0.02;
+        //if transform > 0.5 {
+        //    transform = -0.5;
+        //}
 
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 1.0, 1.0);
+
+        //move left to right
+        //let uniform = uniform! {
+        //    matrix : [
+        //        [1.0, 0.0, 0.0, 0.0],
+        //        [0.0, 1.0, 0.0, 0.0],
+        //        [0.0, 0.0, 1.0, 0.0],
+        //        [transform, 0.0, 0.0, 1.0],
+        //    ]
+        //};
+
+        let uniform = uniform! {
+            matrix: [
+                [ transform.cos(), transform.sin(), 0.0, 0.0],
+                [-transform.sin(), transform.cos(), 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        };
 
         target
             .draw(
                 &vertex_buffer,
                 &indices,
                 &program,
-                &uniform! {t: transform},
+                &uniform,
                 &Default::default(),
             )
             .unwrap();
