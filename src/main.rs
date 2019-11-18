@@ -27,7 +27,7 @@ fn main() {
         position: [0.0, 0.5],
     };
     let vertex3 = Vertex {
-        position: [0.5, -0.5],
+        position: [0.5, -0.25],
     };
     let shape = vec![vertex1, vertex2, vertex3];
 
@@ -40,9 +40,12 @@ fn main() {
         #version 140
 
         in vec2 position;
+        out vec2 my_attr;
+
         uniform mat4 matrix;
 
         void main() {
+            my_attr = position;
             gl_Position = matrix * vec4(position, 0.0, 1.0);
         }
     "#;
@@ -50,10 +53,12 @@ fn main() {
     let fragment_shader_src = r#"
         #version 140
 
+        in vec2 my_attr;
         out vec4 color;
 
         void main() {
-            color = vec4(1.0, 0.0, 0.0, 1.0);
+            
+            color = vec4(my_attr, my_attr);
         }
     "#;
 
@@ -63,32 +68,31 @@ fn main() {
     let mut transform: f32 = -0.5;
     let mut closed = false;
     while !closed {
-        transform += 0.02;
-        //if transform > 0.5 {
-        //    transform = -0.5;
-        //}
+        transform += 0.002;
+        if transform > 0.5 {
+            transform = -0.5;
+        }
 
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 1.0, 1.0);
 
         //move left to right
-        //let uniform = uniform! {
-        //    matrix : [
-        //        [1.0, 0.0, 0.0, 0.0],
-        //        [0.0, 1.0, 0.0, 0.0],
-        //        [0.0, 0.0, 1.0, 0.0],
-        //        [transform, 0.0, 0.0, 1.0],
-        //    ]
-        //};
-
         let uniform = uniform! {
-            matrix: [
-                [ transform.cos(), transform.sin(), 0.0, 0.0],
-                [-transform.sin(), transform.cos(), 0.0, 0.0],
+            matrix : [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
+                [transform, 0.0, 0.0, 1.0],
             ]
         };
+        //let uniform = uniform! {
+        //    matrix: [
+        //        [ transform.cos(), transform.sin(), 0.0, 0.0],
+        //        [-transform.sin(), transform.cos(), 0.0, 0.0],
+        //        [0.0, 0.0, 1.0, 0.0],
+        //        [0.0, 0.0, 0.0, 1.0],
+        //    ]
+        //};
 
         target
             .draw(
