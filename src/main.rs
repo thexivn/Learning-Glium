@@ -1,33 +1,54 @@
 #[macro_use]
 extern crate glium;
+extern crate image;
 
 use glium::{
     glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent},
     index::{NoIndices, PrimitiveType},
+    texture::{RawImage2d, Texture2d},
     Display, Program, Surface, VertexBuffer,
 };
+
+use std::io::Cursor;
 
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 2],
+    tex_coords: [f32; 2]
 }
 
 fn main() {
+    //display
     let mut events_loop = EventsLoop::new();
     let window_builder = WindowBuilder::new().with_title("Titolino");
     let context_builder = ContextBuilder::new();
     let display = Display::new(window_builder, context_builder, &events_loop).unwrap();
+    //image
+    let image = image::load(
+        Cursor::new(&include_bytes!("../assets/texture/brick_wall.png")[..]),
+        image::PNG
+    )
+    .unwrap()
+    .to_rgba();
 
-    implement_vertex!(Vertex, position);
+    let dimensions = image.dimensions();
+    let aimage = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), dimensions);
+    let texture = Texture2d::new(&display, aimage).unwrap();
+    println!("QUi");
+
+    implement_vertex!(Vertex, position, tex_coords);
 
     let vertex1 = Vertex {
         position: [-0.5, -0.5],
+        tex_coords: [0.0, 0.0]
     };
     let vertex2 = Vertex {
         position: [0.0, 0.5],
+        tex_coords: [0.0, 1.0]
     };
     let vertex3 = Vertex {
         position: [0.5, -0.25],
+        tex_coords: [1.0, 0.0]
     };
     let shape = vec![vertex1, vertex2, vertex3];
 
@@ -39,13 +60,14 @@ fn main() {
     let vertex_shader_src = r#"
         #version 140
 
+        in vec2 tex_coords;
         in vec2 position;
-        out vec2 my_attr;
+        out vec2 v_text_coords;
 
         uniform mat4 matrix;
 
         void main() {
-            my_attr = position;
+            v_text_coords = tex_coords;
             gl_Position = matrix * vec4(position, 0.0, 1.0);
         }
     "#;
@@ -53,12 +75,14 @@ fn main() {
     let fragment_shader_src = r#"
         #version 140
 
-        in vec2 my_attr;
+        in vec2 v_text_coords;
         out vec4 color;
+
+        uniform sampler2D tex;
 
         void main() {
             
-            color = vec4(my_attr, my_attr);
+            color = texture(tex, v_text_coords);
         }
     "#;
 
@@ -83,7 +107,8 @@ fn main() {
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [transform, 0.0, 0.0, 1.0],
-            ]
+            ],
+            tex: &texture,
         };
         //let uniform = uniform! {
         //    matrix: [
