@@ -32,8 +32,9 @@ fn main() {
     .to_rgba();
 
     let dimensions = image.dimensions();
-    let aimage = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), dimensions);
-    let texture = Texture2d::new(&display, aimage).unwrap();
+    //rgb case errors
+    let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), dimensions);
+    let texture = Texture2d::new(&display, image).unwrap();
     println!("QUi");
 
     implement_vertex!(Vertex, position, tex_coords);
