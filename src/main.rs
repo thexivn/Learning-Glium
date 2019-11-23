@@ -152,7 +152,7 @@ fn main() {
         }
 
         let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 1.0, 1.0);
+        target.clear_color_and_depth((0.0,0.0,1.0,1.0), 1.0);
 
         //move left to right
         let uniform = uniform! {
@@ -200,7 +200,7 @@ fn get_display(
     event_loop: &EventsLoop,
 ) -> Result<Display, glium::backend::glutin::DisplayCreationError> {
     let window_builder = WindowBuilder::new().with_title(titolo);
-    let context_builder = ContextBuilder::new();
+    let context_builder = ContextBuilder::new().with_depth_buffer(24);
     let display = Display::new(window_builder, context_builder, event_loop)?;
 
     Ok(display)
@@ -233,8 +233,8 @@ fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
                 println!("Faces OK");
                 let mut i = 0;
                 for face in tmp.into_iter() {
-                    for index in face.vertex_index.into_iter() {
-                        face_list[i] = index;
+                    for indx in face.vertex_index.into_iter() {
+                        face_list[i] = indx;
                         i += 1;
                     }
                 }
