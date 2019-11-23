@@ -95,7 +95,6 @@ fn main() {
     let display = get_display("Titolino", &events_loop).unwrap();
     let model = load_3d_model("assets/monkey.ply");
 
-    #[derive(Copy, Clone, Debug)]
     implement_vertex!(Vertex, position, tex_coords);
     implement_vertex!(Normal, normal);
 
