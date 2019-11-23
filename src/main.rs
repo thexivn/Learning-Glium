@@ -4,7 +4,6 @@ extern crate glium;
 use glium::{
     glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent},
     index::PrimitiveType,
-    texture::{RawImage2d, Texture2d},
     Display, IndexBuffer, Program, Surface, VertexBuffer,
 };
 
@@ -12,8 +11,6 @@ use ply_rs::{
     parser::Parser,
     ply::{Property, PropertyAccess},
 };
-
-use std::io::Cursor;
 
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
@@ -28,8 +25,8 @@ struct Normal {
 
 #[derive(Copy, Clone, Debug)]
 struct Shape {
-    vertex : Vertex,
-    normali : Normal
+    vertex: Vertex,
+    normali: Normal,
 }
 
 #[derive(Debug)]
@@ -58,7 +55,7 @@ impl PropertyAccess for Shape {
     fn new() -> Self {
         Shape {
             vertex: Vertex::new(),
-            normali: Normal::new()
+            normali: Normal::new(),
         }
     }
 
@@ -92,56 +89,23 @@ impl PropertyAccess for Face {
 fn main() {
     //display
     let mut events_loop = EventsLoop::new();
-    let window_builder = WindowBuilder::new().with_title("Titolino");
-    let context_builder = ContextBuilder::new();
-    let display = Display::new(window_builder, context_builder, &events_loop).unwrap();
-
-    let file = std::fs::File::open("assets/monkey.ply").unwrap();
-    let mut file = std::io::BufReader::new(file);
-    println!("Monkey OK");
-
-    let shape_parser = Parser::<Shape>::new();
-    let face_parser = Parser::<Face>::new();
-    let header = shape_parser.read_header(&mut file).unwrap();
-    println!("header OK");
-
-    let mut shape_list = Vec::new();
-    let mut face_list = [0u32; 968*3];
-    for (_ignore_key, element) in &header.elements {
-        match element.name.as_ref() {
-            "vertex" => {
-                shape_list = shape_parser
-                    .read_payload_for_element(&mut file, &element, &header)
-                    .unwrap();
-                println!("shape OK");
-            }
-            "face" => {
-                let tmp = face_parser
-                    .read_payload_for_element(&mut file, &element, &header)
-                    .unwrap();
-                println!("Faces OK");
-                let mut i = 0;
-                for face in tmp.into_iter() {
-                    
-                    for index in face.vertex_index.into_iter() {
-                        face_list[i] = index;
-                        i = i + 1;
-                    }
-                }
-            }
-            _ => panic!("Enexpeced element!"),
-        }
-    }
+    let display = get_display("Titolino", &events_loop).unwrap();
+    let model = load_3d_model("assets/monkey.ply");
 
     implement_vertex!(Vertex, position, tex_coords);
     implement_vertex!(Normal, normal);
 
-    let vertex_list: Vec<Vertex> = shape_list.clone().into_iter().map(|shape| shape.vertex).collect();
-    let normal_list: Vec<Normal> = shape_list.into_iter().map(|shape| shape.normali).collect();
+    let vertex_list: Vec<Vertex> = model
+        .0
+        .clone()
+        .into_iter()
+        .map(|shape| shape.vertex)
+        .collect();
+    let normal_list: Vec<Normal> = model.0.into_iter().map(|shape| shape.normali).collect();
 
-    let position = VertexBuffer::new(&display, &vertex_list ).unwrap();
+    let position = VertexBuffer::new(&display, &vertex_list).unwrap();
     let normals = VertexBuffer::new(&display, &normal_list).unwrap();
-    let indices = IndexBuffer::new(&display, PrimitiveType::TrianglesList, &face_list).unwrap();
+    let indices = IndexBuffer::new(&display, PrimitiveType::TrianglesList, &model.1).unwrap();
 
     //Note that it is important to write matrix * vertex and not vertex * matrix.
     //Matrix operations produce different results depending on the order.
@@ -191,25 +155,24 @@ fn main() {
         target.clear_color(0.0, 0.0, 1.0, 1.0);
 
         //move left to right
-        //let uniform = uniform! {
-        //    matrix : [
-        //        [transform, 0.0, 0.0, 0.0],
-        //        [0.0, transform, 0.0, 0.0],
-        //        [0.0, 0.0, transform, 0.0],
-        //        [0.0, 0.0, 0.0, 1.0f32],
-        //    ],
-        //    u_light: [-1.0, 0.4, 0.9f32]
-        //};
         let uniform = uniform! {
-            matrix: [
-                [ transform.cos(), transform.sin(), 0.0, 0.0],
-                [-transform.sin(), transform.cos(), transform.cos()*0.5, 0.0],
-                [transform.sin(), -transform.sin(), -transform.sin(), 0.0],
-                [0.0, 0.0, 0.0, 1.0],
+            matrix : [
+                [0.5, 0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0],
+                [0.0, 0.0, 0.0, 1.0f32],
             ],
-            u_light: [-1.0, 0.4, 0.9f32],
+            u_light: [-1.0, 0.4, 0.9f32]
         };
-
+        //let uniform = uniform! {
+        //    matrix: [
+        //        [ transform.cos(), transform.sin(), 0.0, 0.0],
+        //        [-transform.sin(), transform.cos(), transform.cos()*0.5, 0.0],
+        //        [transform.sin(), -transform.sin(), -transform.sin(), 0.0],
+        //        [0.0, 0.0, 0.0, 1.0],
+        //    ],
+        //    u_light: [-1.0, 0.4, 0.9f32],
+        //};
         target
             .draw(
                 (&position, &normals),
@@ -230,4 +193,55 @@ fn main() {
             _ => (),
         });
     }
+}
+
+fn get_display(
+    titolo: &'static str,
+    event_loop: &EventsLoop,
+) -> Result<Display, glium::backend::glutin::DisplayCreationError> {
+    let window_builder = WindowBuilder::new().with_title(titolo);
+    let context_builder = ContextBuilder::new();
+    let display = Display::new(window_builder, context_builder, event_loop)?;
+
+    Ok(display)
+}
+
+fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
+    let file = std::fs::File::open(file_name).unwrap();
+    let mut file = std::io::BufReader::new(file);
+    println!("File OK");
+
+    let shape_parser = Parser::<Shape>::new();
+    let face_parser = Parser::<Face>::new();
+    let header = shape_parser.read_header(&mut file).unwrap();
+    println!("header OK");
+
+    let mut shape_list = Vec::new();
+    let mut face_list = [0u32; 968 * 3];
+    for (_ignore_key, element) in &header.elements {
+        match element.name.as_ref() {
+            "vertex" => {
+                shape_list = shape_parser
+                    .read_payload_for_element(&mut file, &element, &header)
+                    .unwrap();
+                println!("shape OK");
+            }
+            "face" => {
+                let tmp = face_parser
+                    .read_payload_for_element(&mut file, &element, &header)
+                    .unwrap();
+                println!("Faces OK");
+                let mut i = 0;
+                for face in tmp.into_iter() {
+                    for index in face.vertex_index.into_iter() {
+                        face_list[i] = index;
+                        i += 1;
+                    }
+                }
+            }
+            _ => panic!("Enexpeced element!"),
+        }
+    }
+
+    (shape_list, face_list)
 }
