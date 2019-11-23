@@ -4,7 +4,8 @@ extern crate glium;
 use glium::{
     glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent},
     index::PrimitiveType,
-    Display, IndexBuffer, Program, Surface, VertexBuffer,
+    draw_parameters::DepthTest,
+    Display, IndexBuffer, Program, Surface, VertexBuffer, DrawParameters, Depth
 };
 
 use ply_rs::{
@@ -110,18 +111,19 @@ fn main() {
     //Note that it is important to write matrix * vertex and not vertex * matrix.
     //Matrix operations produce different results depending on the order.
     let vertex_shader_src = r#"
-        #version 150      // updated
+        #version 140
 
         in vec3 position;
         in vec3 normal;
         
-        out vec3 v_normal;      // new
+        out vec3 v_normal;
         
+        uniform mat4 perspective;       // new
         uniform mat4 matrix;
         
         void main() {
-            v_normal = transpose(inverse(mat3(matrix))) * normal;       // new
-            gl_Position = matrix * vec4(position, 1.0);
+            v_normal = transpose(inverse(mat3(matrix))) * normal;
+            gl_Position = perspective * matrix * vec4(position, 1.0);       // new
         }
     "#;
 
@@ -154,14 +156,16 @@ fn main() {
         let mut target = display.draw();
         target.clear_color_and_depth((0.0,0.0,1.0,1.0), 1.0);
 
+
         //move left to right
         let uniform = uniform! {
             matrix : [
                 [0.5, 0.0, 0.0, 0.0],
                 [0.0, 0.5, 0.0, 0.0],
                 [0.0, 0.0, 0.5, 0.0],
-                [0.0, 0.0, 0.0, 1.0f32],
+                [0.0, 0.0, 5.0, 1.0f32],
             ],
+            perspective: get_perspective_matrix(&target),
             u_light: [-1.0, 0.4, 0.9f32]
         };
         //let uniform = uniform! {
@@ -173,13 +177,22 @@ fn main() {
         //    ],
         //    u_light: [-1.0, 0.4, 0.9f32],
         //};
+        let params = DrawParameters {
+            depth: Depth {
+                test: DepthTest::IfLess,
+                write: true,
+                .. Default::default()
+            },
+            .. Default::default()
+        };
+
         target
             .draw(
                 (&position, &normals),
                 &indices,
                 &program,
                 &uniform,
-                &Default::default(),
+                &params
             )
             .unwrap();
 
@@ -244,4 +257,23 @@ fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
     }
 
     (shape_list, face_list)
+}
+
+
+fn get_perspective_matrix(target : & glium::Frame) -> [[f32;4];4]{
+    let (width, height) = target.get_dimensions();
+    let aspect_ratio = height as f32 / width as f32;
+
+    let fov: f32 = 3.141592 / 3.0;
+    let zfar = 1024.0;
+    let znear = 0.1;
+
+    let f = 1.0 / (fov / 2.0).tan();
+
+    [
+        [f *   aspect_ratio   ,    0.0,              0.0              ,   0.0],
+        [         0.0         ,     f ,              0.0              ,   0.0],
+        [         0.0         ,    0.0,  (zfar+znear)/(zfar-znear)    ,   1.0],
+        [         0.0         ,    0.0, -(2.0*zfar*znear)/(zfar-znear),   0.0],
+    ]
 }
