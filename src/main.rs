@@ -2,10 +2,12 @@
 extern crate glium;
 
 use glium::{
-    glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent},
-    index::PrimitiveType,
     draw_parameters::DepthTest,
-    Display, IndexBuffer, Program, Surface, VertexBuffer, DrawParameters, Depth
+    glutin::{
+        ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent,
+    },
+    index::PrimitiveType,
+    Depth, Display, DrawParameters, IndexBuffer, Program, Surface, VertexBuffer,
 };
 
 use ply_rs::{
@@ -93,6 +95,7 @@ fn main() {
     let display = get_display("Titolino", &events_loop).unwrap();
     let model = load_3d_model("assets/monkey.ply");
 
+    #[derive(Copy, Clone, Debug)]
     implement_vertex!(Vertex, position, tex_coords);
     implement_vertex!(Normal, normal);
 
@@ -118,12 +121,14 @@ fn main() {
         
         out vec3 v_normal;
         
-        uniform mat4 perspective;       // new
-        uniform mat4 matrix;
+        uniform mat4 perspective;
+        uniform mat4 view;
+        uniform mat4 model;
         
         void main() {
-            v_normal = transpose(inverse(mat3(matrix))) * normal;
-            gl_Position = perspective * matrix * vec4(position, 1.0);       // new
+            mat4 modelview = view * model;
+            v_normal = transpose(inverse(mat3(modelview))) * normal;
+            gl_Position = perspective * modelview * vec4(position, 1.0);
         }
     "#;
 
@@ -147,24 +152,27 @@ fn main() {
 
     let mut transform: f32 = -0.5;
     let mut closed = false;
+    let mut camera_position = [2.0, -1.0, 1.0];
+    let mut camera_direction = [-2.0, 1.0, 1.0];
+
     while !closed {
-        transform += 0.02;
-        if transform > 100.0 {
-            transform = -0.0;
+        transform += 0.002;
+        if transform > 10.0 {
+            transform = 1.0;
         }
 
         let mut target = display.draw();
-        target.clear_color_and_depth((0.0,0.0,1.0,1.0), 1.0);
-
+        target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
         //move left to right
         let uniform = uniform! {
-            matrix : [
+            model : [
                 [0.5, 0.0, 0.0, 0.0],
                 [0.0, 0.5, 0.0, 0.0],
                 [0.0, 0.0, 0.5, 0.0],
-                [0.0, 0.0, 5.0, 1.0f32],
+                [0.0, 0.0, 2.0, 1.0f32],
             ],
+            view: view_matrix(&camera_position, &camera_direction, &[0.0, 1.0, 0.0]),
             perspective: get_perspective_matrix(&target),
             u_light: [-1.0, 0.4, 0.9f32]
         };
@@ -181,19 +189,13 @@ fn main() {
             depth: Depth {
                 test: DepthTest::IfLess,
                 write: true,
-                .. Default::default()
+                ..Default::default()
             },
-            .. Default::default()
+            ..Default::default()
         };
 
         target
-            .draw(
-                (&position, &normals),
-                &indices,
-                &program,
-                &uniform,
-                &params
-            )
+            .draw((&position, &normals), &indices, &program, &uniform, &params)
             .unwrap();
 
         target.finish().unwrap();
@@ -201,6 +203,26 @@ fn main() {
         events_loop.poll_events(|ev| match ev {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => closed = true,
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if input.state == glium::glutin::ElementState::Pressed {
+                        match input.virtual_keycode {
+                            Some(key) => match key {
+                                glium::glutin::VirtualKeyCode::W => camera_position[0] += 0.01,
+                                glium::glutin::VirtualKeyCode::S => camera_position[0] -= 0.01,
+                                glium::glutin::VirtualKeyCode::Q => camera_position[1] += 0.01,
+                                glium::glutin::VirtualKeyCode::E => camera_position[1] -= 0.01,
+                                glium::glutin::VirtualKeyCode::D => camera_position[2] += 0.01,
+                                glium::glutin::VirtualKeyCode::A => camera_position[2] -= 0.01,
+                                glium::glutin::VirtualKeyCode::Up => camera_direction[0] += 0.01,
+                                glium::glutin::VirtualKeyCode::Down => camera_direction[0] -= 0.01,
+                                glium::glutin::VirtualKeyCode::Left => camera_direction[2] += 0.01,
+                                glium::glutin::VirtualKeyCode::Right => camera_direction[2] -= 0.01,
+                                _ => (),
+                            },
+                            None => (),
+                        }
+                    }
+                }
                 _ => (),
             },
             _ => (),
@@ -259,8 +281,7 @@ fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
     (shape_list, face_list)
 }
 
-
-fn get_perspective_matrix(target : & glium::Frame) -> [[f32;4];4]{
+fn get_perspective_matrix(target: &glium::Frame) -> [[f32; 4]; 4] {
     let (width, height) = target.get_dimensions();
     let aspect_ratio = height as f32 / width as f32;
 
@@ -271,9 +292,52 @@ fn get_perspective_matrix(target : & glium::Frame) -> [[f32;4];4]{
     let f = 1.0 / (fov / 2.0).tan();
 
     [
-        [f *   aspect_ratio   ,    0.0,              0.0              ,   0.0],
-        [         0.0         ,     f ,              0.0              ,   0.0],
-        [         0.0         ,    0.0,  (zfar+znear)/(zfar-znear)    ,   1.0],
-        [         0.0         ,    0.0, -(2.0*zfar*znear)/(zfar-znear),   0.0],
+        [f * aspect_ratio, 0.0, 0.0, 0.0],
+        [0.0, f, 0.0, 0.0],
+        [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
+        [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0],
+    ]
+}
+
+//The position of the camera in the scene.
+//The direction the camera is facing in scene coordinates.
+//The up vector, representing the direction in scene coordinates of the top of the screen.
+fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
+    let f = {
+        let f = direction;
+        let len = f[0] * f[0] + f[1] * f[1] + f[2] * f[2];
+        let len = len.sqrt();
+        [f[0] / len, f[1] / len, f[2] / len]
+    };
+
+    let s = [
+        up[1] * f[2] - up[2] * f[1],
+        up[2] * f[0] - up[0] * f[2],
+        up[0] * f[1] - up[1] * f[0],
+    ];
+
+    let s_norm = {
+        let len = s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
+        let len = len.sqrt();
+        [s[0] / len, s[1] / len, s[2] / len]
+    };
+
+    let u = [
+        f[1] * s_norm[2] - f[2] * s_norm[1],
+        f[2] * s_norm[0] - f[0] * s_norm[2],
+        f[0] * s_norm[1] - f[1] * s_norm[0],
+    ];
+
+    let p = [
+        -position[0] * s_norm[0] - position[1] * s_norm[1] - position[2] * s_norm[2],
+        -position[0] * u[0] - position[1] * u[1] - position[2] * u[2],
+        -position[0] * f[0] - position[1] * f[1] - position[2] * f[2],
+    ];
+
+    [
+        [s_norm[0], u[0], f[0], 0.0],
+        [s_norm[1], u[1], f[1], 0.0],
+        [s_norm[2], u[2], f[2], 0.0],
+        [p[0], p[1], p[2], 1.0],
     ]
 }
