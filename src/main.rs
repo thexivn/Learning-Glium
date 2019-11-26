@@ -151,27 +151,28 @@ fn main() {
 
     let mut transform: f32 = -0.5;
     let mut closed = false;
-    let mut camera_position = [2.0, -1.0, 1.0];
-    let mut camera_direction = [-2.0, 1.0, 1.0];
+    let mut camera_position = [0.0, -3.0, 0.0];
+    let mut camera_direction = [0.0, 1.0, 0.0];
 
     while !closed {
         transform += 0.002;
-        if transform > 10.0 {
+        if transform > 5.0 {
             transform = 1.0;
         }
 
         let mut target = display.draw();
         target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
+        
         //move left to right
         let uniform = uniform! {
             model : [
-                [0.5, 0.0, 0.0, 0.0],
-                [0.0, 0.5, 0.0, 0.0],
-                [0.0, 0.0, 0.5, 0.0],
-                [0.0, 0.0, 2.0, 1.0f32],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 2.0, 0.0, 1.0f32],
             ],
-            view: view_matrix(&camera_position, &camera_direction, &[0.0, 1.0, 0.0]),
+            view: view_matrix(&camera_position, &camera_direction, &[0.0, 0.0, 1.0]),
             perspective: get_perspective_matrix(&target),
             u_light: [-1.0, 0.4, 0.9f32]
         };
@@ -206,8 +207,16 @@ fn main() {
                     if input.state == glium::glutin::ElementState::Pressed {
                         match input.virtual_keycode {
                             Some(key) => match key {
-                                glium::glutin::VirtualKeyCode::W => camera_position[0] += 0.01,
-                                glium::glutin::VirtualKeyCode::S => camera_position[0] -= 0.01,
+                                glium::glutin::VirtualKeyCode::W => {
+                                    camera_position[0] += camera_direction[0] * 0.01;
+                                    camera_position[1] += camera_direction[1] * 0.01;
+                                    camera_position[2] += camera_direction[2] * 0.01;
+                                },
+                                glium::glutin::VirtualKeyCode::S => {
+                                    camera_position[0] -= camera_direction[0] * 0.01;
+                                    camera_position[1] -= camera_direction[1] * 0.01;
+                                    camera_position[2] -= camera_direction[2] * 0.01;
+                                },
                                 glium::glutin::VirtualKeyCode::Q => camera_position[1] += 0.01,
                                 glium::glutin::VirtualKeyCode::E => camera_position[1] -= 0.01,
                                 glium::glutin::VirtualKeyCode::D => camera_position[2] += 0.01,
@@ -216,6 +225,7 @@ fn main() {
                                 glium::glutin::VirtualKeyCode::Down => camera_direction[0] -= 0.01,
                                 glium::glutin::VirtualKeyCode::Left => camera_direction[2] += 0.01,
                                 glium::glutin::VirtualKeyCode::Right => camera_direction[2] -= 0.01,
+                                glium::glutin::VirtualKeyCode::F1 => println!("Position: {:?}, Direction {:?}", camera_position, camera_direction),
                                 _ => (),
                             },
                             None => (),
@@ -226,7 +236,10 @@ fn main() {
             },
             _ => (),
         });
+
     }
+
+    println!("fine");
 }
 
 fn get_display(
