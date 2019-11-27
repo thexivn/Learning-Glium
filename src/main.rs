@@ -1,10 +1,11 @@
 #[macro_use]
 extern crate glium;
+mod util;
 
 use glium::{
     draw_parameters::DepthTest,
     glutin::{
-        ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent,
+        ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent, VirtualKeyCode
     },
     index::PrimitiveType,
     Depth, Display, DrawParameters, IndexBuffer, Program, Surface, VertexBuffer,
@@ -153,6 +154,7 @@ fn main() {
     let mut closed = false;
     let mut camera_position = [0.0, -3.0, 0.0];
     let mut camera_direction = [0.0, 1.0, 0.0];
+    let speed = 0.15;
 
     while !closed {
         transform += 0.002;
@@ -163,7 +165,7 @@ fn main() {
         let mut target = display.draw();
         target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
-        
+        let (w, h) = target.get_dimensions();
         //move left to right
         let uniform = uniform! {
             model : [
@@ -172,8 +174,8 @@ fn main() {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 2.0, 0.0, 1.0f32],
             ],
-            view: view_matrix(&camera_position, &camera_direction, &[0.0, 0.0, 1.0]),
-            perspective: get_perspective_matrix(&target),
+            view: util::view_matrix(&camera_position, &camera_direction, &[0.0, 0.0, 1.0]),
+            perspective: util::get_perspective_matrix(w as f32, h as f32),
             u_light: [-1.0, 0.4, 0.9f32]
         };
         //let uniform = uniform! {
@@ -207,25 +209,35 @@ fn main() {
                     if input.state == glium::glutin::ElementState::Pressed {
                         match input.virtual_keycode {
                             Some(key) => match key {
-                                glium::glutin::VirtualKeyCode::W => {
-                                    camera_position[0] += camera_direction[0] * 0.01;
-                                    camera_position[1] += camera_direction[1] * 0.01;
-                                    camera_position[2] += camera_direction[2] * 0.01;
+                                VirtualKeyCode::W => {
+                                    camera_position[0] += camera_direction[0] * speed;
+                                    camera_position[1] += camera_direction[1] * speed;
+                                    camera_position[2] += camera_direction[2] * speed;
                                 },
-                                glium::glutin::VirtualKeyCode::S => {
-                                    camera_position[0] -= camera_direction[0] * 0.01;
-                                    camera_position[1] -= camera_direction[1] * 0.01;
-                                    camera_position[2] -= camera_direction[2] * 0.01;
+                                VirtualKeyCode::S => {
+                                    camera_position[0] -= camera_direction[0] * speed;
+                                    camera_position[1] -= camera_direction[1] * speed;
+                                    camera_position[2] -= camera_direction[2] * speed;
                                 },
-                                glium::glutin::VirtualKeyCode::Q => camera_position[1] += 0.01,
-                                glium::glutin::VirtualKeyCode::E => camera_position[1] -= 0.01,
-                                glium::glutin::VirtualKeyCode::D => camera_position[2] += 0.01,
-                                glium::glutin::VirtualKeyCode::A => camera_position[2] -= 0.01,
-                                glium::glutin::VirtualKeyCode::Up => camera_direction[0] += 0.01,
-                                glium::glutin::VirtualKeyCode::Down => camera_direction[0] -= 0.01,
-                                glium::glutin::VirtualKeyCode::Left => camera_direction[2] += 0.01,
-                                glium::glutin::VirtualKeyCode::Right => camera_direction[2] -= 0.01,
-                                glium::glutin::VirtualKeyCode::F1 => println!("Position: {:?}, Direction {:?}", camera_position, camera_direction),
+                                VirtualKeyCode::Q => camera_position[1] += speed,
+                                VirtualKeyCode::E => camera_position[1] -= speed,
+                                VirtualKeyCode::D => {
+                                    let perpendicular = [-camera_direction[1], camera_direction[0], 0.0];
+                                    camera_position[0] += perpendicular[0] * speed;
+                                    camera_position[1] += perpendicular[1] * speed;
+                                    camera_position[2] += perpendicular[2] * speed;
+                                },
+                                VirtualKeyCode::A => {
+                                    let perpendicular = [camera_direction[1], camera_direction[0], 0.0];
+                                    camera_position[0] += perpendicular[0] * speed;
+                                    camera_position[1] += perpendicular[1] * speed;
+                                    camera_position[2] += perpendicular[2] * speed;
+                                },
+                                VirtualKeyCode::Up => camera_direction[0] += speed,
+                                VirtualKeyCode::Down => camera_direction[0] -= speed,
+                                VirtualKeyCode::Left => camera_direction[2] += speed,
+                                VirtualKeyCode::Right => camera_direction[2] -= speed,
+                                VirtualKeyCode::F1 => println!("Position: {:?}, Direction {:?}", camera_position, camera_direction),
                                 _ => (),
                             },
                             None => (),
@@ -293,63 +305,4 @@ fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
     (shape_list, face_list)
 }
 
-fn get_perspective_matrix(target: &glium::Frame) -> [[f32; 4]; 4] {
-    let (width, height) = target.get_dimensions();
-    let aspect_ratio = height as f32 / width as f32;
 
-    let fov: f32 = 3.141592 / 3.0;
-    let zfar = 1024.0;
-    let znear = 0.1;
-
-    let f = 1.0 / (fov / 2.0).tan();
-
-    [
-        [f * aspect_ratio, 0.0, 0.0, 0.0],
-        [0.0, f, 0.0, 0.0],
-        [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
-        [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0],
-    ]
-}
-
-//The position of the camera in the scene.
-//The direction the camera is facing in scene coordinates.
-//The up vector, representing the direction in scene coordinates of the top of the screen.
-fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
-    let f = {
-        let f = direction;
-        let len = f[0] * f[0] + f[1] * f[1] + f[2] * f[2];
-        let len = len.sqrt();
-        [f[0] / len, f[1] / len, f[2] / len]
-    };
-
-    let s = [
-        up[1] * f[2] - up[2] * f[1],
-        up[2] * f[0] - up[0] * f[2],
-        up[0] * f[1] - up[1] * f[0],
-    ];
-
-    let s_norm = {
-        let len = s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
-        let len = len.sqrt();
-        [s[0] / len, s[1] / len, s[2] / len]
-    };
-
-    let u = [
-        f[1] * s_norm[2] - f[2] * s_norm[1],
-        f[2] * s_norm[0] - f[0] * s_norm[2],
-        f[0] * s_norm[1] - f[1] * s_norm[0],
-    ];
-
-    let p = [
-        -position[0] * s_norm[0] - position[1] * s_norm[1] - position[2] * s_norm[2],
-        -position[0] * u[0] - position[1] * u[1] - position[2] * u[2],
-        -position[0] * f[0] - position[1] * f[1] - position[2] * f[2],
-    ];
-
-    [
-        [s_norm[0], u[0], f[0], 0.0],
-        [s_norm[1], u[1], f[1], 0.0],
-        [s_norm[2], u[2], f[2], 0.0],
-        [p[0], p[1], p[2], 1.0],
-    ]
-}
