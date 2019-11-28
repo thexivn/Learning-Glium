@@ -157,9 +157,9 @@ fn main() {
     let speed = 0.15;
 
     while !closed {
-        transform += 0.002;
-        if transform > 5.0 {
-            transform = 1.0;
+        transform += 0.02;
+        if transform >= 6.28 {
+            transform = 0.0;
         }
 
         let mut target = display.draw();
@@ -169,24 +169,16 @@ fn main() {
         //move left to right
         let uniform = uniform! {
             model : [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
+                [transform.cos(), -transform.sin(), 0.0, 0.0],
+                [transform.sin(), transform.cos(), 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
-                [0.0, 2.0, 0.0, 1.0f32],
+                [0.0, 0.0, transform.cos()/2.0, 1.0f32],
             ],
             view: util::view_matrix(&camera_position, &camera_direction, &[0.0, 0.0, 1.0]),
             perspective: util::get_perspective_matrix(w as f32, h as f32),
             u_light: [-1.0, 0.4, 0.9f32]
         };
-        //let uniform = uniform! {
-        //    matrix: [
-        //        [ transform.cos(), transform.sin(), 0.0, 0.0],
-        //        [-transform.sin(), transform.cos(), transform.cos()*0.5, 0.0],
-        //        [transform.sin(), -transform.sin(), -transform.sin(), 0.0],
-        //        [0.0, 0.0, 0.0, 1.0],
-        //    ],
-        //    u_light: [-1.0, 0.4, 0.9f32],
-        //};
+
         let params = DrawParameters {
             depth: Depth {
                 test: DepthTest::IfLess,
