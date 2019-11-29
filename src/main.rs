@@ -5,7 +5,8 @@ mod util;
 use glium::{
     draw_parameters::DepthTest,
     glutin::{
-        ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent, VirtualKeyCode
+        dpi::LogicalSize, ContextBuilder, Event, EventsLoop, VirtualKeyCode, WindowBuilder,
+        WindowEvent,
     },
     index::PrimitiveType,
     Depth, Display, DrawParameters, IndexBuffer, Program, Surface, VertexBuffer,
@@ -205,31 +206,36 @@ fn main() {
                                     camera_position[0] += camera_direction[0] * speed;
                                     camera_position[1] += camera_direction[1] * speed;
                                     camera_position[2] += camera_direction[2] * speed;
-                                },
+                                }
                                 VirtualKeyCode::S => {
                                     camera_position[0] -= camera_direction[0] * speed;
                                     camera_position[1] -= camera_direction[1] * speed;
                                     camera_position[2] -= camera_direction[2] * speed;
-                                },
+                                }
                                 VirtualKeyCode::Q => camera_position[1] += speed,
                                 VirtualKeyCode::E => camera_position[1] -= speed,
                                 VirtualKeyCode::D => {
-                                    let perpendicular = [-camera_direction[1], camera_direction[0], 0.0];
+                                    let perpendicular =
+                                        [-camera_direction[1], camera_direction[0], 0.0];
                                     camera_position[0] += perpendicular[0] * speed;
                                     camera_position[1] += perpendicular[1] * speed;
                                     camera_position[2] += perpendicular[2] * speed;
-                                },
+                                }
                                 VirtualKeyCode::A => {
-                                    let perpendicular = [camera_direction[1], camera_direction[0], 0.0];
+                                    let perpendicular =
+                                        [camera_direction[1], camera_direction[0], 0.0];
                                     camera_position[0] += perpendicular[0] * speed;
                                     camera_position[1] += perpendicular[1] * speed;
                                     camera_position[2] += perpendicular[2] * speed;
-                                },
+                                }
                                 VirtualKeyCode::Up => camera_direction[0] += speed,
                                 VirtualKeyCode::Down => camera_direction[0] -= speed,
                                 VirtualKeyCode::Left => camera_direction[2] += speed,
                                 VirtualKeyCode::Right => camera_direction[2] -= speed,
-                                VirtualKeyCode::F1 => println!("Position: {:?}, Direction {:?}", camera_position, camera_direction),
+                                VirtualKeyCode::F1 => println!(
+                                    "Position: {:?}, Direction {:?}",
+                                    camera_position, camera_direction
+                                ),
                                 _ => (),
                             },
                             None => (),
@@ -240,7 +246,6 @@ fn main() {
             },
             _ => (),
         });
-
     }
 
     println!("fine");
@@ -250,8 +255,15 @@ fn get_display(
     titolo: &'static str,
     event_loop: &EventsLoop,
 ) -> Result<Display, glium::backend::glutin::DisplayCreationError> {
-    let window_builder = WindowBuilder::new().with_title(titolo);
-    let context_builder = ContextBuilder::new().with_depth_buffer(24);
+    let window_builder = WindowBuilder::new()
+        .with_title(titolo)
+        .with_dimensions(LogicalSize::from((1024, 768)))
+        .with_resizable(false);
+    let context_builder = ContextBuilder::new()
+        .with_depth_buffer(24)
+        .with_vsync(true)
+        .with_multisampling(8)
+        .with_double_buffer(Some(true));
     let display = Display::new(window_builder, context_builder, event_loop)?;
 
     Ok(display)
@@ -296,5 +308,3 @@ fn load_3d_model(file_name: &'static str) -> (Vec<Shape>, [u32; 2904]) {
 
     (shape_list, face_list)
 }
-
-
