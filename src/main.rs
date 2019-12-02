@@ -1,15 +1,22 @@
 #[macro_use]
 extern crate glium;
 mod util;
+use std::time::SystemTime;
 
 use glium::{
     draw_parameters::DepthTest,
     glutin::{
         dpi::LogicalSize, ContextBuilder, Event, EventsLoop, VirtualKeyCode, WindowBuilder,
-        WindowEvent,
+        WindowEvent, ElementState
     },
     index::PrimitiveType,
     Depth, Display, DrawParameters, IndexBuffer, Program, Surface, VertexBuffer,
+};
+
+use cgmath::{
+    prelude::*,
+    Vector3,
+    Deg, Euler, Quaternion
 };
 
 use ply_rs::{
@@ -153,12 +160,17 @@ fn main() {
 
     let mut transform: f32 = -0.5;
     let mut closed = false;
-    let mut camera_position = [0.0, -3.0, 0.0];
-    let mut camera_direction = [0.0, 1.0, 0.0];
-    let speed = 0.15;
+    let mut camera_position : Vector3<f32> = Vector3::new(0.0, -3.0, 0.0);
+    let mut camera_direction : Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
+    let mut mose_delta_vector : Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
+    let speed = 0.02;
+    let mut mouse_pressed = false;
+    let mut now = SystemTime::now();
 
     while !closed {
-        transform += 0.02;
+        let delta_time = now.elapsed().unwrap().as_millis() as f32;
+        now = SystemTime::now();
+        transform += speed * 0.03 * delta_time;
         if transform >= 6.28 {
             transform = 0.0;
         }
@@ -175,7 +187,7 @@ fn main() {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, transform.cos()/2.0, 1.0f32],
             ],
-            view: util::view_matrix(&camera_position, &camera_direction, &[0.0, 0.0, 1.0]),
+            view: util::view_matrix(&camera_position, &camera_direction, util::Direction::Z),
             perspective: util::get_perspective_matrix(w as f32, h as f32),
             u_light: [-1.0, 0.4, 0.9f32]
         };
@@ -194,7 +206,7 @@ fn main() {
             .unwrap();
 
         target.finish().unwrap();
-
+        
         events_loop.poll_events(|ev| match ev {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => closed = true,
@@ -203,35 +215,25 @@ fn main() {
                         match input.virtual_keycode {
                             Some(key) => match key {
                                 VirtualKeyCode::W => {
-                                    camera_position[0] += camera_direction[0] * speed;
-                                    camera_position[1] += camera_direction[1] * speed;
-                                    camera_position[2] += camera_direction[2] * speed;
+                                    camera_position += camera_direction * speed * delta_time;
                                 }
                                 VirtualKeyCode::S => {
-                                    camera_position[0] -= camera_direction[0] * speed;
-                                    camera_position[1] -= camera_direction[1] * speed;
-                                    camera_position[2] -= camera_direction[2] * speed;
+                                    camera_position -= camera_direction * speed * delta_time;
                                 }
-                                VirtualKeyCode::Q => camera_position[1] += speed,
-                                VirtualKeyCode::E => camera_position[1] -= speed,
+                                VirtualKeyCode::Q => camera_position[1] += speed * delta_time,
+                                VirtualKeyCode::E => camera_position[1] -= speed * delta_time,
                                 VirtualKeyCode::D => {
-                                    let perpendicular =
-                                        [-camera_direction[1], camera_direction[0], 0.0];
-                                    camera_position[0] += perpendicular[0] * speed;
-                                    camera_position[1] += perpendicular[1] * speed;
-                                    camera_position[2] += perpendicular[2] * speed;
+                                    let perpendicular : Vector3<f32> = Vector3::new(-camera_direction.y, camera_direction.x, 0.0);
+                                    camera_position += perpendicular * speed * delta_time;
                                 }
                                 VirtualKeyCode::A => {
-                                    let perpendicular =
-                                        [camera_direction[1], camera_direction[0], 0.0];
-                                    camera_position[0] += perpendicular[0] * speed;
-                                    camera_position[1] += perpendicular[1] * speed;
-                                    camera_position[2] += perpendicular[2] * speed;
+                                    let perpendicular : Vector3<f32> = Vector3::new(camera_direction.y, camera_direction.x, 0.0);
+                                    camera_position += perpendicular * speed * delta_time;
                                 }
-                                VirtualKeyCode::Up => camera_direction[0] += speed,
-                                VirtualKeyCode::Down => camera_direction[0] -= speed,
-                                VirtualKeyCode::Left => camera_direction[2] += speed,
-                                VirtualKeyCode::Right => camera_direction[2] -= speed,
+                                //VirtualKeyCode::Up => camera_direction[0] += speed,
+                                //VirtualKeyCode::Down => camera_direction[0] -= speed,
+                                //VirtualKeyCode::Left => camera_direction[2] += speed,
+                                //VirtualKeyCode::Right => camera_direction[2] -= speed,
                                 VirtualKeyCode::F1 => println!(
                                     "Position: {:?}, Direction {:?}",
                                     camera_position, camera_direction
@@ -242,12 +244,41 @@ fn main() {
                         }
                     }
                 }
+                WindowEvent::MouseInput {state, button, ..} =>{
+                    match state {
+                        ElementState::Pressed => match button {
+                            glium::glutin::MouseButton::Left => mouse_pressed = true,
+                            _ => mouse_pressed = false
+                        } ,
+                        ElementState::Released => mouse_pressed = false,
+                    }
+                },
+                WindowEvent::CursorMoved {position, ..} => {
+
+                    if mouse_pressed {
+                        mose_delta_vector.y -= position.x as f32;
+                        mose_delta_vector.z -= position.y as f32;
+                        let q = Quaternion::from(Euler {
+                            x: Deg(mose_delta_vector.z*0.1),
+                            y: Deg(0.0),
+                            z: Deg(mose_delta_vector.y*0.1)
+                        });
+                        camera_direction = q.rotate_vector(camera_direction);
+                        //mose_delta_vector.z -= -1.0 * position.y as f32;
+                        print!("{:?}, {:?}                \r", camera_direction, q);
+                        //camera_direction -= mose_delta_vector *0.005* speed;
+                        
+                    }
+                    mose_delta_vector.y = position.x as f32;
+                    mose_delta_vector.z = position.y as f32;
+                    
+                } 
                 _ => (),
             },
             _ => (),
         });
     }
-
+    println!("");
     println!("fine");
 }
 

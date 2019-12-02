@@ -1,3 +1,12 @@
+use cgmath::Vector3;
+
+pub enum Direction{
+    X,
+    Y,
+    Z,
+}
+
+
 pub fn get_perspective_matrix(width: f32,height : f32) -> [[f32; 4]; 4] {
     let aspect_ratio = height / width;
 
@@ -18,7 +27,8 @@ pub fn get_perspective_matrix(width: f32,height : f32) -> [[f32; 4]; 4] {
 ///The position of the camera in the scene.
 ///The direction the camera is facing in scene coordinates.
 ///The up vector, representing the direction in scene coordinates of the top of the screen.
-pub fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
+pub fn view_matrix(position: &Vector3<f32>, direction: &Vector3<f32>, up_dir: Direction) -> [[f32; 4]; 4] {
+    let up = get_unit_vector(up_dir);
     let f = {
         let f = direction;
         let len = f[0] * f[0] + f[1] * f[1] + f[2] * f[2];
@@ -45,9 +55,9 @@ pub fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> 
     ];
 
     let p = [
-        -position[0] * s_norm[0] - position[1] * s_norm[1] - position[2] * s_norm[2],
-        -position[0] * u[0] - position[1] * u[1] - position[2] * u[2],
-        -position[0] * f[0] - position[1] * f[1] - position[2] * f[2],
+        -position.x * s_norm[0] - position.y * s_norm[1] - position.z * s_norm[2],
+        -position.x * u[0] - position.y * u[1] - position.z * u[2],
+        -position.x * f[0] - position.y * f[1] - position.z * f[2],
     ];
 
     [
@@ -56,4 +66,12 @@ pub fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> 
         [s_norm[2], u[2], f[2], 0.0],
         [p[0], p[1], p[2], 1.0],
     ]
+}
+
+fn get_unit_vector(dir : Direction) -> Vector3::<f32> {
+    match dir {
+        Direction::X => Vector3::new(1.0, 0.0, 0.0),
+        Direction::Y => Vector3::new(0.0, 1.0, 0.0),
+        Direction::Z => Vector3::new(0.0, 0.0, 1.0),
+    }
 }
